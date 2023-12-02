@@ -1,0 +1,61 @@
+pipeline
+{
+    agent any
+    stages
+    {
+        stage('continous download')
+        {
+            steps
+            {
+                git 'https://github.com/sudarshansw7/mymaven.git'
+            }
+        }
+        stage('continous build')
+        {
+            steps
+            {
+                sh 'mvn package'
+            }
+        }
+        stage('build docker image')
+        {
+            steps
+            {
+                sh 'cp /var/lib/jenkins/workspace/end-to-end-project/webapp/target/webapp.war /var/lib/jenkins/workspace/end-to-end-project '
+                
+                sh '''cat >dockerfile<<EOF
+
+FROM tomee
+MAINTAINER sudarshansw7@gmail.com
+COPY *.war /usr/local/tomee/webapps/testapp.war
+
+EOF
+'''
+sh 'docker build -t sudarshansw7/myapplication .'
+            }
+        }
+        stage('push docker image into docker registry')
+        {
+            steps
+            {
+                sh 'docker push sudarshansw7/myapplication'
+            }
+        }
+        stage('create containers in QA servers')
+        {
+            steps
+            {
+                sh 'ssh ubuntu@172.31.35.236 ansible-playbook /home/ubuntu/playbooks/playbookapp.yml -b'
+            }
+        }
+        stage('Functional Testing')
+        {
+            steps
+            {
+                git 'https://github.com/sudarshansw7/myfunctionaltesting.git'
+                
+                sh 'java -jar /var/lib/jenkins/workspace/end-to-end-project/testing.jar'
+            }
+        }
+    }
+}
